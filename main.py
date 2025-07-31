@@ -1,30 +1,34 @@
 from flask import Flask, request
 import psycopg2
+import psycopg2.extras
 
-app = Flask(__name__)  # <-- fixed here
+app = Flask(__name__)
 
-# PostgreSQL connection with updated credentials
-db = psycopg2.connect(
-    host="dpg-d0q7sgeuk2gs73ablnu0-a.oregon-postgres.render.com",
-    database="flask_user_login",
-    user="flask_user_login_user",
-    password="WromWw5Vwl17J3YQWUEDdrUjHUJAM2A2",
-    port=5432,
-    sslmode='require'
-)
+# PostgreSQL connection (SSL required for Render)
+try:
+    db = psycopg2.connect(
+        host="dpg-d0q7sgeuk2gs73ablnu0-a.oregon-postgres.render.com",
+        database="flask_user_login",
+        user="flask_user_login_user",
+        password="WromWw5Vwl17J3YQWUEDdrUjHUJAM2A2",
+        port=5432,
+        sslmode='require'
+    )
+except psycopg2.OperationalError as e:
+    print("Database connection failed:", e)
+    raise
 
-# Create users table if it does not exist
+# Create users table if not exists
 def create_users_table():
-    cursor = db.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username VARCHAR(100) UNIQUE NOT NULL,
-            password VARCHAR(100) NOT NULL
-        );
-    """)
+    with db.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(100) UNIQUE NOT NULL,
+                password VARCHAR(100) NOT NULL
+            );
+        """)
     db.commit()
-    cursor.close()
 
 create_users_table()
 
@@ -45,18 +49,18 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
-        cursor = db.cursor()
         try:
-            cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, password))
+            with db.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO users (username, password) VALUES (%s, %s)",
+                    (username, password)
+                )
             db.commit()
-            message = '<h3>Registration successful! <a href="/">Go to Login</a></h3>'
+            return '<h3>Registration successful. <a href="/">Go to Login</a></h3>'
         except psycopg2.IntegrityError:
             db.rollback()
-            message = '<h3>Username already exists. Please try a different one. <a href="/register">Try again</a></h3>'
-        cursor.close()
-        return message
-    else:  # <-- fixed indentation here
+            return '<h3>Username already exists. <a href="/register">Try again</a></h3>'
+    else:
         return '''
             <h2>User Registration</h2>
             <form method="POST" action="/register">
@@ -70,16 +74,16 @@ def register():
 def login():
     username = request.form['username']
     password = request.form['password']
-
-    cursor = db.cursor()
-    cursor.execute("SELECT * FROM users WHERE username=%s AND password=%s", (username, password))
-    user = cursor.fetchone()
-    cursor.close()
-
+    with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+        cursor.execute(
+            "SELECT * FROM users WHERE username=%s AND password=%s",
+            (username, password)
+        )
+        user = cursor.fetchone()
     if user:
-        return f"<h3>Welcome, {username}!</h3>"
+        return f"<h3>Welcome, {username}.</h3>"
     else:
         return "<h3>Invalid username or password. <a href='/'>Try again</a></h3>"
 
-if __name__ == '__main__':  # <-- fixed here
-    app.run(host='0.0.0.0', port=8080, debug=True)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)
