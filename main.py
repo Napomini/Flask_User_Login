@@ -9,7 +9,8 @@ db = psycopg2.connect(
     database="flask_user_login",
     user="flask_user_login_user",
     password="WromWw5Vwl17J3YQWUEDdrUjHUJAM2A2",
-    port=5432
+    port=5432,
+    sslmode='require'
 )
 
 # Create users table if it does not exist
