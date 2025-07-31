@@ -4,9 +4,8 @@ import psycopg2.extras
 
 app = Flask(__name__)
 
-# PostgreSQL connection (SSL required for Render)
-try:
-    db = psycopg2.connect(
+def get_db_connection():
+    return psycopg2.connect(
         host="dpg-d0q7sgeuk2gs73ablnu0-a.oregon-postgres.render.com",
         database="flask_user_login",
         user="flask_user_login_user",
@@ -14,13 +13,11 @@ try:
         port=5432,
         sslmode='require'
     )
-except psycopg2.OperationalError as e:
-    print("Database connection failed:", e)
-    raise
 
 # Create users table if not exists
 def create_users_table():
-    with db.cursor() as cursor:
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -28,7 +25,8 @@ def create_users_table():
                 password VARCHAR(100) NOT NULL
             );
         """)
-    db.commit()
+    conn.commit()
+    conn.close()
 
 create_users_table()
 
@@ -49,17 +47,20 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        conn = get_db_connection()
         try:
-            with db.cursor() as cursor:
+            with conn.cursor() as cursor:
                 cursor.execute(
                     "INSERT INTO users (username, password) VALUES (%s, %s)",
                     (username, password)
                 )
-            db.commit()
-            return '<h3>Registration successful. <a href="/">Go to Login</a></h3>'
+            conn.commit()
+            message = '<h3>Registration successful. <a href="/">Go to Login</a></h3>'
         except psycopg2.IntegrityError:
-            db.rollback()
-            return '<h3>Username already exists. <a href="/register">Try again</a></h3>'
+            conn.rollback()
+            message = '<h3>Username already exists. <a href="/register">Try again</a></h3>'
+        conn.close()
+        return message
     else:
         return '''
             <h2>User Registration</h2>
@@ -74,12 +75,15 @@ def register():
 def login():
     username = request.form['username']
     password = request.form['password']
-    with db.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+    conn = get_db_connection()
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute(
             "SELECT * FROM users WHERE username=%s AND password=%s",
             (username, password)
         )
         user = cursor.fetchone()
+    conn.close()
+
     if user:
         return f"<h3>Welcome, {username}.</h3>"
     else:
