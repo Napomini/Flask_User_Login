@@ -6,12 +6,11 @@ app = Flask(__name__)
 
 def get_db_connection():
     return psycopg2.connect(
-        host="dpg-d0q7sgeuk2gs73ablnu0-a.oregon-postgres.render.com",
-        database="flask_user_login",
-        user="flask_user_login_user",
-        password="WromWw5Vwl17J3YQWUEDdrUjHUJAM2A2",
-        port=5432,
-        sslmode='require'
+        host="dpg-d25oct63jp1c73a6775g-a",
+        database="validate_user",
+        user="root",
+        password="n3Qi5ffvKEt7DaBPoiP7zWMcgo1EjF9x",
+        port=5432
     )
 
 # Create users table if not exists
